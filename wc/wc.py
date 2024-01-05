@@ -14,23 +14,23 @@ TOTAL = 'total'
 
 ''' Minimum number of command line arguments present if multiple files given
 based on if options were provided '''
-MIN_NUM_ARGS_MUL_FILES_NO_OPT = 2
-MIN_NUM_ARGS_MUL_FILES_OPT = 3
+MIN_NUM_ARGS_NO_OPTS = 2
+MIN_NUM_ARGS_W_OPT = 3
 
 def get_counts(file):
-    num_chars = num_words = num_bytes = num_lines = 0
+    num_lines = num_words = num_bytes = num_chars = 0
     for line in file:
-        num_chars += len(line.decode())
+        num_lines += 1
         num_words += len(line.split())
         num_bytes += len(line)
-        num_lines += 1
-    return num_chars, num_words, num_bytes, num_lines
+        num_chars += len(line.decode())
+    return num_lines, num_words, num_bytes, num_chars
 
 def get_output_line(*args):
     return ' '.join(str(arg) for arg in args)
 
-def print_output(output):
-    for line in output:
+def print_wc_output(wc_output):
+    for line in wc_output:
         print(line)
 
 def word_count():
@@ -59,14 +59,19 @@ def word_count():
                         action="store_true")
     args = parser.parse_args()
 
-    def has_opt():
+    def has_option():
         return args.c or args.l or args.m or args.w
 
-    output = deque()
+    def got_multiple_files_no_options():
+        return len(sys.argv) > MIN_NUM_ARGS_NO_OPTS and not has_option()
 
-    def get_std_in_word_count():
-        num_chars, num_words, num_bytes, num_lines = \
-            get_counts(sys.stdin.buffer)
+    def got_multiple_files_options():
+        return len(sys.argv) > MIN_NUM_ARGS_W_OPT and has_option()
+
+    def received_multiple_files():
+        return got_multiple_files_no_options() or got_multiple_files_options()
+
+    def get_wc_line(num_lines, num_words, num_bytes, num_chars, line_name):
         line = []
         if args.l:
             line.append(get_output_line(num_lines))
@@ -76,67 +81,72 @@ def word_count():
             line.append(get_output_line(num_bytes))
         if args.m:
             line.append(get_output_line(num_chars))
-        if not has_opt():
-            line.append(get_output_line(num_lines, num_words, num_bytes))
-        output.append(' '.join(line))
+        if not has_option():
+            line.append(get_output_line(num_lines,
+                                        num_words,
+                                        num_bytes))
+        if line_name:
+            line.append(line_name)
+        return ' '.join(line)
 
-    def get_files_word_count():
-        # Get the counts based on the given options for each file
-        arg_to_total = defaultdict(int)
-        for file in args.files:
+    def update_option_totals(num_lines, num_words, num_bytes, num_chars):
+        if args.l:
+            option_to_total[LINES] += num_lines
+        if args.w:
+            option_to_total[WORDS] += num_words
+        if args.c:
+            option_to_total[BYTES] += num_bytes
+        if args.m:
+            option_to_total[CHARS] += num_chars
+        if not has_option():
+            option_to_total[LINES] += num_lines
+            option_to_total[WORDS] += num_words
+            option_to_total[BYTES] += num_bytes
+
+    # Prepare files for processing based on input received
+    files = None
+    if args.files == sys.stdin:
+        files = [args.files]
+    else:
+        files = args.files
+
+    # Build wc output
+    option_to_total = defaultdict(int)
+    wc_output = deque()
+    for file in files:
+        # Get parts of output line
+        line_name, counts = None, None
+        if args.files == sys.stdin:
+            counts = get_counts(sys.stdin.buffer)
+        else:
             absolute_path = os.path.dirname(__file__)
             full_path = os.path.join(absolute_path, file)
+            line_name = file
 
             with open(full_path, 'rb') as f:
-                num_chars, num_words, num_bytes, num_lines = get_counts(f)
-                line = []
-                if args.l:
-                    arg_to_total[LINES] += num_lines
-                    line.append(get_output_line(num_lines))
-                if args.w:
-                    arg_to_total[WORDS] += num_words
-                    line.append(get_output_line(num_words))
-                if args.c:
-                    arg_to_total[BYTES] += num_bytes
-                    line.append(get_output_line(num_bytes))
-                if args.m:
-                    arg_to_total[CHARS] += num_chars
-                    line.append(get_output_line(num_chars))
-                if not has_opt():
-                    arg_to_total[LINES] += num_lines
-                    arg_to_total[WORDS] += num_words
-                    arg_to_total[BYTES] += num_bytes
-                    line.append(get_output_line(num_lines,
-                                                num_words,
-                                                num_bytes))
-                line.append(file)
-                output.append(' '.join(line))
+                counts = get_counts(f)
 
-        # Include count totals of files if multiple files given
-        line = []
-        if (not has_opt() and len(sys.argv) > MIN_NUM_ARGS_MUL_FILES_NO_OPT or
-            has_opt() and len(sys.argv) > MIN_NUM_ARGS_MUL_FILES_OPT):
-            if args.c:
-                line.append(get_output_line(arg_to_total[BYTES]))
-            if args.l:
-                line.append(get_output_line(arg_to_total[LINES]))
-            if args.m:
-                line.append(get_output_line(arg_to_total[CHARS]))
-            if args.w:
-                line.append(get_output_line(arg_to_total[WORDS]))
-            if not has_opt():
-                line.append(get_output_line(arg_to_total[LINES],
-                                            arg_to_total[WORDS],
-                                            arg_to_total[BYTES]))
-            line.append(TOTAL)
-            output.append(' '.join(line))
+        # Create output line
+        num_lines, num_words, num_bytes, num_chars = counts
+        wc_output.append(get_wc_line(num_lines,
+                                     num_words,
+                                     num_bytes,
+                                     num_chars,
+                                     line_name))
 
-    if args.files == sys.stdin:
-        get_std_in_word_count()
-    else:
-        get_files_word_count()
+        # Update totals if multiple files received
+        if received_multiple_files():
+            update_option_totals(num_lines, num_words, num_bytes, num_chars)
 
-    print_output(output)
+    # Create totals output line if multiple files received
+    if len(files) > 1:
+        wc_output.append(get_wc_line(option_to_total[LINES],
+                                     option_to_total[WORDS],
+                                     option_to_total[BYTES],
+                                     option_to_total[CHARS],
+                                     TOTAL))
+
+    print_wc_output(wc_output)
 
 if __name__ == "__main__":
     word_count()
