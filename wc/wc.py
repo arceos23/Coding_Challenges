@@ -3,12 +3,13 @@ import os
 import sys
 from collections import defaultdict, deque
 
-# Encoding of count metric to option
+# Encodings of count metrics to options
 BYTES = 'c'
 LINES = 'l'
 CHARS = 'm'
 WORDS = 'w'
 
+# Output summary
 TOTAL = 'total'
 
 ''' Minimum number of command line arguments present if multiple files given
@@ -20,7 +21,6 @@ def get_counts(file):
     num_chars = num_words = num_bytes = num_lines = 0
     for line in file:
         num_chars += len(line.decode())
-        num_chars += len(line)
         num_words += len(line.split())
         num_bytes += len(line)
         num_lines += 1
@@ -37,24 +37,24 @@ def word_count():
     parser = argparse.ArgumentParser(prog="wc",
                                     description="""A simple wc utility that
                                     displays the number of lines, words,
-                                    and bytes contained in each input
-                                    file, or standard input (if no file is
-                                    specified) to the standard output.""")
+                                    bytes, or characters contained in each,
+                                    input file, or standard input (if no file
+                                    is specified) to the standard output.""")
     parser.add_argument("files", nargs="*", default=sys.stdin)
     parser.add_argument("-l",
-                        help="""The number of lines in the input file is
+                        help="""The number of lines in each input file is
                         written to the standard output.""",
                         action="store_true")
     parser.add_argument("-c",
-                        help="""The number of bytes in the input file is
+                        help="""The number of bytes in each input file is
                         written to the standard output.""",
                         action="store_true")
     parser.add_argument("-w",
-                        help="""The number of words in the input file is
+                        help="""The number of words in each input file is
                         written to the standard output.""",
                         action="store_true")
     parser.add_argument("-m",
-                        help="""The number of characters in the input file
+                        help="""The number of characters in each input file
                         is written to the standard output.""",
                         action="store_true")
     args = parser.parse_args()
@@ -68,14 +68,14 @@ def word_count():
         num_chars, num_words, num_bytes, num_lines = \
             get_counts(sys.stdin.buffer)
         line = []
-        if args.c:
-            line.append(get_output_line(num_bytes))
         if args.l:
             line.append(get_output_line(num_lines))
-        if args.m:
-            line.append(get_output_line(num_chars))
         if args.w:
             line.append(get_output_line(num_words))
+        if args.c:
+            line.append(get_output_line(num_bytes))
+        if args.m:
+            line.append(get_output_line(num_chars))
         if not has_opt():
             line.append(get_output_line(num_lines, num_words, num_bytes))
         output.append(' '.join(line))
@@ -90,18 +90,18 @@ def word_count():
             with open(full_path, 'rb') as f:
                 num_chars, num_words, num_bytes, num_lines = get_counts(f)
                 line = []
-                if args.c:
-                    arg_to_total[BYTES] += num_bytes
-                    line.append(get_output_line(num_bytes))
                 if args.l:
                     arg_to_total[LINES] += num_lines
                     line.append(get_output_line(num_lines))
-                if args.m:
-                    arg_to_total[CHARS] += num_chars
-                    line.append(get_output_line(num_chars))
                 if args.w:
                     arg_to_total[WORDS] += num_words
                     line.append(get_output_line(num_words))
+                if args.c:
+                    arg_to_total[BYTES] += num_bytes
+                    line.append(get_output_line(num_bytes))
+                if args.m:
+                    arg_to_total[CHARS] += num_chars
+                    line.append(get_output_line(num_chars))
                 if not has_opt():
                     arg_to_total[LINES] += num_lines
                     arg_to_total[WORDS] += num_words
